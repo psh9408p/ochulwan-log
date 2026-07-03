@@ -58,9 +58,9 @@ export function createAttendanceService() {
       return {
         status: "created" as const,
         record,
-        message: `${input.displayName}님 오늘 ${dailyRank}번째 오출완, ${formatKoreanTime(
+        message: `${input.displayName}님 오늘 ${dailyRank}번째 오출완! ${formatKoreanTime(
           input.now,
-        )} 도장 완료. 오늘의 칭호: ${title}`,
+        )} 현장 완료. 오늘의 칭호: ${title}`,
       };
     },
   };
@@ -102,8 +102,8 @@ export async function checkInWithPrisma(prisma: PrismaClient, input: CheckInInpu
   return {
     status: "created" as const,
     record,
-    message: `${input.displayName}님 오늘 ${dailyRank}번째 오출완, ${formatKoreanTime(
+    message: `${input.displayName}님 오늘 ${dailyRank}번째 오출완! ${formatKoreanTime(
       input.now,
-    )} 도장 완료. 오늘의 칭호: ${title}`,
+    )} 현장 완료. 오늘의 칭호: ${title}`,
   };
 }

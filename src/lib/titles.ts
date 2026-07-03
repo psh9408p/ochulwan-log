@@ -3,7 +3,7 @@ const TITLES = [
   "출근의 지배자",
   "지각 방어 성공",
   "커피 전사",
-  "오늘도 해냈다",
+  "오늘의 대장",
 ];
 
 export function pickTitle(seed: string): string {

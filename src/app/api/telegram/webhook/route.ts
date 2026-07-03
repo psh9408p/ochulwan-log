@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   if (parsed.type === "register") {
     await sendTelegramMessage({
       chatId: configuredChatId,
-      text: `${member.displayName}님 등록 완료. 이제 ㅇㅊㅇ 준비 끝.`,
+      text: `${member.displayName}님 등록 완료. 이제 ㅇㅊㅇ 준비 끝!`,
     });
     return NextResponse.json({ ok: true });
   }

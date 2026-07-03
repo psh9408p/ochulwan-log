@@ -4,7 +4,7 @@ import { parseTelegramText } from "./parser";
 describe("parseTelegramText", () => {
   it("detects check-in message", () => {
     expect(parseTelegramText("ㅇㅊㅇ")).toEqual({ type: "checkin" });
-    expect(parseTelegramText("  ㅇㅊㅇ  ")).toEqual({ type: "checkin" });
+    expect(parseTelegramText("  ㅇㅊㅇ ")).toEqual({ type: "checkin" });
   });
 
   it("detects registration command", () => {
