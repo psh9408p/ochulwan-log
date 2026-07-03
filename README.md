@@ -137,11 +137,3 @@ Webhook secret은 `TELEGRAM_WEBHOOK_SECRET`과 같은 값으로 설정합니다.
 7. 웹 대시보드에서 출근 상태 확인
 ```
 
-## 다음 작업 후보
-
-1. GitHub에서 PR 생성 후 `master`로 merge
-2. 배포 환경 선택: Vercel, Railway, Render 등
-3. PostgreSQL 생성 및 `DATABASE_URL` 연결
-4. 텔레그램 봇 생성 및 Webhook 연결
-5. 실제 그룹에서 `ㅇㅊㅇ`, `/등록`, `/요청 이름` 테스트
-6. 이후 개인 출근시간 패턴 페이지 추가
