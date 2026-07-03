@@ -1,225 +1,229 @@
-# Telegram Attendance Design
+# 텔레그램 오출완 출석체크 설계
 
-## Summary
+## 요약
 
-Build "오출완", a playful attendance dashboard connected to a Telegram group chat. People check in by typing `ㅇㅊㅇ` in the active Telegram chat. The site shows who has completed today's check-in, who has not, the user's own stamp, and lightweight social nudges to ask others to check in.
+`오출완`은 텔레그램 그룹 채팅방과 연결되는 재미있는 출석체크 대시보드다. 사용자가 활성화된 텔레그램 채팅방에서 `ㅇㅊㅇ`을 입력하면 오늘 출근 완료로 기록된다. 웹 사이트에서는 오늘 출근한 사람, 아직 출근하지 않은 사람, 나의 출근도장, 그리고 다른 사람에게 `ㅇㅊㅇ`을 요청하는 기능을 보여준다.
 
-The recommended architecture is a Next.js full-stack app with a database and Telegram webhook endpoint.
+권장 구조는 `Next.js 풀스택 앱 + PostgreSQL 데이터베이스 + 텔레그램 Webhook`이다. Prisma를 기본 ORM 후보로 두되, 구현 과정에서 더 적합한 타입 안전 쿼리 도구가 있으면 조정할 수 있다.
 
-Use PostgreSQL for the database so the same schema works for local development and production deployment. Prisma is the preferred ORM unless implementation constraints make another typed query layer a better fit.
+## 목표
 
-## Goals
+- 텔레그램 그룹 멤버가 `ㅇㅊㅇ` 메시지로 출근 체크를 할 수 있다.
+- 사용자가 처음 `ㅇㅊㅇ`을 입력하거나 등록 명령을 쓰면 자동으로 멤버 등록된다.
+- 웹 대시보드에서 오늘 출근한 사람과 아직 출근하지 않은 사람을 보여준다.
+- 출근 시간, 오늘의 순번, 짧은 랜덤 칭호나 멘트를 함께 보여준다.
+- 이미 오출완한 사용자가 아직 안 한 사람에게 `ㅇㅊㅇ`을 요청할 수 있다.
+- 요청 기능은 웹 버튼과 텔레그램 명령을 모두 지원한다.
+- 추후 개인별 출근시간 패턴 페이지를 만들 수 있도록 출근 기록을 누적 저장한다.
 
-- Let Telegram group members check in by sending `ㅇㅊㅇ`.
-- Automatically register users the first time they check in or use a registration command.
-- Show today's checked-in and not-yet-checked-in members on a web dashboard.
-- Show each check-in time, daily order, and a short random title or message.
-- Let checked-in users request not-yet-checked-in members to type `ㅇㅊㅇ`.
-- Support both web button requests and Telegram command requests.
-- Keep the data model ready for later personal attendance pattern pages.
+## MVP에서 제외할 것
 
-## Non-Goals For MVP
+- 텔레그램 그룹 전체 멤버를 자동으로 가져오는 기능.
+- 정해진 시간마다 자동으로 계속 알림을 보내는 기능.
+- 복잡한 로그인, 조직 관리, 권한 관리.
+- 여러 텔레그램 그룹을 동시에 운영하는 기능.
+- 고급 분석 화면. 단, 나중에 확장할 수 있도록 기록은 저장한다.
 
-- Automatically scraping every Telegram group member.
-- Fully automated daily reminder spam.
-- Complex login or organization management.
-- Multi-group support beyond a single configured Telegram chat.
-- Advanced analytics beyond storing enough history for future use.
+## 제품 방향
 
-## Product Direction
+선택한 화면 방향은 `응원 게시판형`이다.
 
-The selected visual direction is "응원 게시판형".
+대시보드는 친근한 팀 보드처럼 보여야 한다.
 
-The dashboard should feel like a friendly team board:
+- `오늘출근완료` 상태를 크게 보여준다.
+- 오늘 오출완한 사람 수를 보여준다.
+- 출근 완료한 사람 목록에 시간과 재미있는 칭호를 붙인다.
+- 아직 출근하지 않은 사람 목록에 `ㅇㅊㅇ 요청` 버튼을 붙인다.
+- 사용자가 자신의 출근도장을 확인할 수 있는 영역을 둔다.
+- 텔레그램에서도 `/요청 이름` 명령을 쓸 수 있다는 힌트를 보여준다.
 
-- Prominent "오늘출근완료" status.
-- Count of today's completed check-ins.
-- List of completed members with check-in time and fun title.
-- List of not-yet-completed members with `ㅇㅊㅇ 요청` buttons.
-- A visible "my stamp" area for the current user.
-- A small hint that Telegram command `/요청 이름` is also available.
+## 텔레그램 동작
 
-## Telegram Behavior
+### 출근 체크
 
-### Check-In
+사용자가 설정된 텔레그램 그룹에서 `ㅇㅊㅇ`을 입력하면 다음 순서로 처리한다.
 
-When a user sends `ㅇㅊㅇ` in the configured Telegram group:
+1. Webhook이 텔레그램 업데이트를 받는다.
+2. 업데이트가 설정된 채팅방에서 온 것인지 확인한다.
+3. 텔레그램 사용자를 로컬 멤버 테이블에 생성하거나 갱신한다.
+4. 오늘 출근 기록이 없으면 새 출근 기록을 만든다.
+5. 봇이 그룹 채팅방에 짧은 응답 메시지를 보낸다.
 
-1. The webhook receives the Telegram update.
-2. The app verifies the update is from the configured chat.
-3. The Telegram user is created or updated in the local member table.
-4. The app creates today's attendance record if one does not already exist.
-5. The bot replies in the group with a short message containing:
-   - Display name.
-   - Today's order.
-   - Check-in time.
-   - A random short title or comment.
+응답 메시지에는 다음 정보가 들어간다.
 
-If the user already checked in today, the bot replies with an "already completed" style message and does not create a duplicate record.
+- 표시 이름.
+- 오늘의 출근 순번.
+- 출근 시간.
+- 랜덤 칭호나 짧은 멘트.
 
-### Request Another User
+이미 오늘 출근 체크를 한 사용자가 다시 `ㅇㅊㅇ`을 입력하면 중복 기록은 만들지 않는다. 대신 이미 완료했다는 식의 짧고 유쾌한 메시지를 보낸다.
 
-The app supports two request paths:
+### 다른 사람에게 요청
 
-- Web: click `ㅇㅊㅇ 요청` beside a not-yet-completed member.
-- Telegram: send `/요청 이름`.
+요청 기능은 두 가지 경로를 지원한다.
 
-The bot sends a playful mention-style message in the Telegram group asking that person to check in. The request should be rate-limited per target member to prevent repeated spam.
+- 웹: 미출근자 옆의 `ㅇㅊㅇ 요청` 버튼을 누른다.
+- 텔레그램: `/요청 이름`을 입력한다.
 
-### Registration
+봇은 텔레그램 그룹에 해당 사용자를 멘션하는 장난스러운 요청 메시지를 보낸다. 같은 대상에게 너무 자주 요청하지 못하도록 간단한 rate limit을 둔다.
 
-Telegram does not provide a general reliable way for a bot to fetch all group members. The MVP uses user registration:
+### 멤버 등록
 
-- A member is registered when they first send `ㅇㅊㅇ`.
-- A member can also register through a command such as `/등록`.
-- Only registered members appear in the not-yet-completed list.
+텔레그램 봇은 일반적으로 그룹 전체 멤버 목록을 안정적으로 가져올 수 없다. 따라서 MVP는 사용자 등록형으로 간다.
 
-This avoids depending on Telegram capabilities that are limited or administrator-dependent.
+- 사용자가 처음 `ㅇㅊㅇ`을 입력하면 멤버로 등록된다.
+- `/등록` 같은 명령으로도 멤버 등록할 수 있다.
+- 등록된 멤버만 `아직 출근 안 한 사람` 목록에 표시된다.
 
-## Web Dashboard
+이 방식은 텔레그램 권한이나 관리자 설정에 덜 의존해서 MVP 구현에 적합하다.
 
-### Main View
+## 웹 대시보드
 
-The dashboard shows the current local date's attendance state:
+### 메인 화면
 
-- Date and live status.
-- Total completed count.
-- First check-in of the day.
-- Current user's check-in status.
-- Remaining count.
-- Completed list sorted by check-in time.
-- Not-yet-completed list sorted by a stable member order or recent activity.
+대시보드는 현재 로컬 날짜 기준의 출근 상태를 보여준다.
 
-For the MVP, the dashboard is a shared board for the configured Telegram chat. The "my stamp" area can be driven by a simple registered-member selector stored in the browser. A later version can replace this with Telegram Login or another authenticated identity flow.
+- 날짜와 실시간 상태.
+- 오늘 출근 완료한 총 인원.
+- 오늘 가장 먼저 출근한 사람.
+- 현재 사용자의 출근 상태.
+- 아직 남은 미출근 인원.
+- 출근 완료 목록. 출근 시간순으로 정렬한다.
+- 미출근 목록. 안정적인 멤버 순서나 최근 활동 기준으로 정렬한다.
 
-Each completed item shows:
+출근 완료 항목에는 다음을 표시한다.
 
-- Rank.
-- Display name.
-- Check-in time.
-- Random title/comment.
+- 오늘의 순번.
+- 표시 이름.
+- 출근 시간.
+- 랜덤 칭호나 멘트.
 
-Each not-yet-completed item shows:
+미출근 항목에는 다음을 표시한다.
 
-- Display name.
-- Helpful secondary text, such as last check-in time or average check-in time when available.
-- `ㅇㅊㅇ 요청` action.
+- 표시 이름.
+- 마지막 출근 시간이나 평균 출근 시간 같은 보조 정보.
+- `ㅇㅊㅇ 요청` 액션.
 
-### Future Personal Pattern View
+MVP에서 대시보드는 설정된 텔레그램 채팅방의 공유 보드로 만든다. `나의 출근도장` 영역은 브라우저에 저장된 간단한 등록 멤버 선택값으로 처리할 수 있다. 이후 버전에서는 텔레그램 로그인이나 다른 인증 방식으로 교체할 수 있다.
 
-The data model should preserve check-in history so a future personal page can show:
+### 추후 개인 출근 패턴 화면
 
-- Average check-in time.
-- Earliest and latest check-in.
-- Day-of-week pattern.
-- Recent streak.
-- Calendar or timeline of check-ins.
+출근 기록은 개인 패턴 분석을 위해 누적 저장한다. 추후 개인 페이지에서는 다음 정보를 보여줄 수 있다.
 
-This is not part of the first MVP screen, but the schema must not block it.
+- 평균 출근 시간.
+- 가장 빠른 출근 시간과 가장 늦은 출근 시간.
+- 요일별 출근 패턴.
+- 최근 연속 출근 기록.
+- 캘린더 또는 타임라인 형태의 출근 기록.
 
-## Architecture
+이 화면은 첫 MVP 범위에는 넣지 않지만, 데이터 구조는 이 확장을 막지 않도록 설계한다.
 
-Use a single Next.js app:
+## 아키텍처
 
-- App Router pages for the dashboard and future profile views.
-- Route handlers for Telegram webhook and dashboard actions.
-- Server-side database access for attendance state.
-- PostgreSQL for durable attendance history.
-- Client components only where interactivity is needed, such as request buttons and live refresh.
+하나의 Next.js 앱으로 구성한다.
 
-Suggested API routes:
+- App Router로 대시보드와 추후 개인 페이지를 만든다.
+- Route Handler로 텔레그램 Webhook과 대시보드 액션을 처리한다.
+- 서버에서 데이터베이스를 조회하고 출근 상태를 계산한다.
+- 출근 기록은 PostgreSQL에 저장한다.
+- 요청 버튼이나 실시간 갱신처럼 상호작용이 필요한 부분만 Client Component로 만든다.
 
-- `POST /api/telegram/webhook`: receive Telegram updates.
-- `POST /api/requests`: send a check-in request from the web dashboard.
-- `GET /api/today`: fetch today's attendance state if the dashboard uses client refresh.
+제안 API 라우트:
 
-Suggested server modules:
+- `POST /api/telegram/webhook`: 텔레그램 업데이트 수신.
+- `POST /api/requests`: 웹 대시보드에서 `ㅇㅊㅇ 요청` 전송.
+- `GET /api/today`: 클라이언트 갱신이 필요할 때 오늘 출근 상태 조회.
 
-- `telegram`: parse updates and send bot messages.
-- `attendance`: check-in creation, duplicate handling, daily summaries.
-- `members`: registration and display-name matching.
-- `requests`: request validation and rate limiting.
-- `titles`: random title/comment selection.
+제안 서버 모듈:
 
-## Data Model
+- `telegram`: 텔레그램 업데이트 파싱과 봇 메시지 전송.
+- `attendance`: 출근 기록 생성, 중복 처리, 일일 요약.
+- `members`: 멤버 등록과 표시 이름 매칭.
+- `requests`: 요청 검증과 rate limit 처리.
+- `titles`: 랜덤 칭호와 멘트 선택.
 
-Core tables:
+## 데이터 모델
 
-- `members`
-  - `id`
-  - `telegram_user_id`
-  - `telegram_username`
-  - `display_name`
-  - `first_seen_at`
-  - `last_seen_at`
-  - `is_active`
+핵심 테이블:
 
-- `attendance_records`
-  - `id`
-  - `member_id`
-  - `attendance_date`
-  - `checked_in_at`
-  - `daily_rank`
-  - `title`
-  - unique key on `member_id + attendance_date`
+### `members`
 
-- `checkin_requests`
-  - `id`
-  - `requester_member_id`
-  - `target_member_id`
-  - `requested_at`
-  - `source` (`web` or `telegram`)
+- `id`
+- `telegram_user_id`
+- `telegram_username`
+- `display_name`
+- `first_seen_at`
+- `last_seen_at`
+- `is_active`
 
-The `attendance_records` table is the basis for future personal pattern analytics.
+### `attendance_records`
 
-## Error Handling
+- `id`
+- `member_id`
+- `attendance_date`
+- `checked_in_at`
+- `daily_rank`
+- `title`
+- `member_id + attendance_date` 유니크 제약
 
-- Ignore webhook updates from unknown chats.
-- Ignore messages that are not recognized commands or `ㅇㅊㅇ`.
-- Return a friendly duplicate response for repeated same-day check-ins.
-- If `/요청 이름` does not match a registered member, reply with a short "not found" message.
-- If the same person is requested too frequently, reply that they were already nudged recently.
-- If Telegram send fails, log the error and return a non-secret generic error to the web action.
+### `checkin_requests`
 
-## Security And Configuration
+- `id`
+- `requester_member_id`
+- `target_member_id`
+- `requested_at`
+- `source`: `web` 또는 `telegram`
 
-Environment variables:
+`attendance_records` 테이블은 추후 개인 출근 패턴 분석의 기반 데이터가 된다.
+
+## 오류 처리
+
+- 설정되지 않은 채팅방에서 온 Webhook 업데이트는 무시한다.
+- 인식할 수 없는 메시지나 명령은 무시한다.
+- 같은 날 중복 `ㅇㅊㅇ`은 친근한 중복 완료 메시지로 처리한다.
+- `/요청 이름`이 등록된 멤버와 매칭되지 않으면 찾을 수 없다는 짧은 메시지를 보낸다.
+- 같은 대상에게 너무 자주 요청하면 이미 요청했다는 메시지를 보낸다.
+- 텔레그램 메시지 전송에 실패하면 서버에는 로그를 남기고, 웹에는 민감한 정보가 없는 일반 오류를 반환한다.
+
+## 보안과 설정
+
+필요한 환경 변수:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `TELEGRAM_CHAT_ID`
 - `DATABASE_URL`
 
-Webhook requests should verify a secret token or configured webhook secret header. Bot tokens must never be committed.
+Webhook 요청은 secret token 또는 설정된 secret header로 검증한다. 봇 토큰과 환경 변수 파일은 절대 커밋하지 않는다.
 
-## Testing Strategy
+## 테스트 전략
 
-Unit tests:
+단위 테스트:
 
-- `ㅇㅊㅇ` message detection.
-- Duplicate check-in behavior.
-- Daily rank assignment.
-- `/요청 이름` parsing and member matching.
-- Request rate limiting.
+- `ㅇㅊㅇ` 메시지 감지.
+- 중복 출근 처리.
+- 일일 순번 계산.
+- `/요청 이름` 파싱과 멤버 매칭.
+- 요청 rate limit 처리.
 
-Integration tests:
+통합 테스트:
 
-- Telegram webhook creates a member and attendance record.
-- Web request creates a request record and sends a Telegram message through a mocked client.
-- Dashboard summary returns completed and not-yet-completed members.
+- 텔레그램 Webhook payload가 멤버와 출근 기록을 생성하는지 확인.
+- 웹 요청이 요청 기록을 만들고 mock 텔레그램 클라이언트로 메시지를 보내는지 확인.
+- 대시보드 요약이 출근 완료자와 미출근자를 올바르게 반환하는지 확인.
 
-Manual verification:
+수동 검증:
 
-- Simulate Telegram webhook payloads locally.
-- Confirm dashboard updates after check-in.
-- Confirm request button triggers a Telegram message in a test chat.
+- 로컬에서 텔레그램 Webhook payload를 시뮬레이션한다.
+- 출근 체크 후 대시보드가 갱신되는지 확인한다.
+- 요청 버튼이 테스트 채팅방에 텔레그램 메시지를 보내는지 확인한다.
 
-## Implementation Order
+## 구현 순서
 
-1. Scaffold Next.js app.
-2. Add database schema and local development database.
-3. Implement attendance and member domain logic with tests.
-4. Implement Telegram webhook route.
-5. Implement dashboard UI from the approved mockup.
-6. Implement web and Telegram request flows.
-7. Add setup documentation for Telegram bot token, chat ID, and webhook.
+1. Next.js 앱을 스캐폴딩한다.
+2. 데이터베이스 스키마와 로컬 개발 DB를 추가한다.
+3. 멤버와 출근 도메인 로직을 테스트와 함께 구현한다.
+4. 텔레그램 Webhook 라우트를 구현한다.
+5. 승인된 목업 기준으로 대시보드 UI를 구현한다.
+6. 웹 버튼과 텔레그램 명령 기반 요청 기능을 구현한다.
+7. 텔레그램 봇 토큰, 채팅방 ID, Webhook 설정 방법을 문서화한다.
