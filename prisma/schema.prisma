@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Member {
+  id               String             @id @default(cuid())
+  telegramUserId   String             @unique
+  telegramUsername String?
+  displayName      String
+  firstSeenAt      DateTime           @default(now())
+  lastSeenAt       DateTime           @updatedAt
+  isActive         Boolean            @default(true)
+  attendance       AttendanceRecord[]
+  sentRequests     CheckinRequest[]   @relation("Requester")
+  receivedRequests CheckinRequest[]   @relation("Target")
+}
+
+model AttendanceRecord {
+  id             String   @id @default(cuid())
+  memberId       String
+  attendanceDate DateTime
+  checkedInAt    DateTime @default(now())
+  dailyRank      Int
+  title          String
+  member         Member   @relation(fields: [memberId], references: [id])
+
+  @@unique([memberId, attendanceDate])
+  @@index([attendanceDate, checkedInAt])
+}
+
+model CheckinRequest {
+  id          String   @id @default(cuid())
+  requesterId String
+  targetId    String
+  requestedAt DateTime @default(now())
+  source      String
+  requester   Member   @relation("Requester", fields: [requesterId], references: [id])
+  target      Member   @relation("Target", fields: [targetId], references: [id])
+
+  @@index([targetId, requestedAt])
+}
