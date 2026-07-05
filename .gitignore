@@ -6,3 +6,5 @@ node_modules/
 
 dev-server.log
 dev-server.err
+cloudflared.log
+cloudflared.err
