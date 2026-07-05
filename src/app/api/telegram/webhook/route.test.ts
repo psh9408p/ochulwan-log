@@ -5,10 +5,12 @@ const findMemberByDisplayName = vi.fn();
 const checkInWithPrisma = vi.fn();
 const createCheckinRequest = vi.fn();
 const sendTelegramMessage = vi.fn();
+const getPendingCheckinRoast = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/members", () => ({ upsertTelegramMember, findMemberByDisplayName }));
 vi.mock("@/lib/attendance", () => ({ checkInWithPrisma }));
+vi.mock("@/lib/pendingCheckins", () => ({ getPendingCheckinRoast }));
 vi.mock("@/lib/requests", () => ({ createCheckinRequest }));
 vi.mock("@/lib/telegram/client", () => ({ sendTelegramMessage }));
 
@@ -21,6 +23,9 @@ describe("telegram webhook", () => {
     upsertTelegramMember.mockResolvedValue({ id: "member-1", displayName: "수진" });
     findMemberByDisplayName.mockResolvedValue({ id: "member-2", displayName: "지훈" });
     checkInWithPrisma.mockResolvedValue({ status: "created", message: "수진님 오출완!" });
+    getPendingCheckinRoast.mockResolvedValue(
+      "아직 안 찍은 사람: 지훈\n지훈님, 혹시 출근은 마음으로만 하셨나요? ㅇㅊㅇ 안 합니까?",
+    );
     createCheckinRequest.mockResolvedValue({ status: "created" });
   });
 
@@ -44,7 +49,7 @@ describe("telegram webhook", () => {
     });
     expect(sendTelegramMessage).toHaveBeenCalledWith({
       chatId: "100",
-      text: "수진님 오출완!",
+      text: "수진님 오출완!\n\n아직 안 찍은 사람: 지훈\n지훈님, 혹시 출근은 마음으로만 하셨나요? ㅇㅊㅇ 안 합니까?",
     });
   });
 

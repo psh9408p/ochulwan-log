@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkInWithPrisma } from "@/lib/attendance";
 import { findMemberByDisplayName, upsertTelegramMember } from "@/lib/members";
+import { getPendingCheckinRoast } from "@/lib/pendingCheckins";
 import { prisma } from "@/lib/prisma";
 import { createCheckinRequest } from "@/lib/requests";
 import { sendTelegramMessage } from "@/lib/telegram/client";
@@ -58,13 +59,22 @@ export async function POST(request: Request) {
   }
 
   if (parsed.type === "checkin") {
+    const now = new Date();
     const result = await checkInWithPrisma(prisma, {
       memberId: member.id,
       displayName: member.displayName,
-      now: new Date(),
+      now,
+    });
+    const pendingRoast = await getPendingCheckinRoast({
+      prisma,
+      currentMemberId: member.id,
+      now,
     });
 
-    await sendTelegramMessage({ chatId: configuredChatId, text: result.message });
+    await sendTelegramMessage({
+      chatId: configuredChatId,
+      text: [result.message, pendingRoast].filter(Boolean).join("\n\n"),
+    });
     return NextResponse.json({ ok: true, status: result.status });
   }
 

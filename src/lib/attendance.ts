@@ -41,6 +41,7 @@ export function createAttendanceService() {
           message: buildDuplicateAttendanceMessage({
             displayName: input.displayName,
             checkedInAt: duplicate.checkedInAt,
+            now: input.now,
           }),
         };
       }
@@ -67,6 +68,7 @@ export function createAttendanceService() {
           displayName: input.displayName,
           dailyRank,
           checkedInAt: input.now,
+          now: input.now,
           title,
         }),
       };
@@ -92,6 +94,7 @@ export async function checkInWithPrisma(prisma: PrismaClient, input: CheckInInpu
       message: buildDuplicateAttendanceMessage({
         displayName: input.displayName,
         checkedInAt: existing.checkedInAt,
+        now: input.now,
       }),
     };
   }
@@ -115,6 +118,7 @@ export async function checkInWithPrisma(prisma: PrismaClient, input: CheckInInpu
       displayName: input.displayName,
       dailyRank,
       checkedInAt: input.now,
+      now: input.now,
       title,
     }),
   };
