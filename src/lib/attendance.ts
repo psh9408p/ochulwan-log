@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
-import { formatKoreanTime, toAttendanceDate } from "./date";
+import {
+  buildCreatedAttendanceMessage,
+  buildDuplicateAttendanceMessage,
+} from "./attendanceMessages";
+import { toAttendanceDate } from "./date";
 import { pickTitle } from "./titles";
 
 export type AttendanceRecordView = {
@@ -34,9 +38,10 @@ export function createAttendanceService() {
         return {
           status: "duplicate" as const,
           record: duplicate,
-          message: `${input.displayName}님은 이미 ${formatKoreanTime(
-            duplicate.checkedInAt,
-          )}에 오출완했습니다.`,
+          message: buildDuplicateAttendanceMessage({
+            displayName: input.displayName,
+            checkedInAt: duplicate.checkedInAt,
+          }),
         };
       }
 
@@ -58,9 +63,12 @@ export function createAttendanceService() {
       return {
         status: "created" as const,
         record,
-        message: `${input.displayName}님 오늘 ${dailyRank}번째 오출완! ${formatKoreanTime(
-          input.now,
-        )} 현장 완료. 오늘의 칭호: ${title}`,
+        message: buildCreatedAttendanceMessage({
+          displayName: input.displayName,
+          dailyRank,
+          checkedInAt: input.now,
+          title,
+        }),
       };
     },
   };
@@ -81,9 +89,10 @@ export async function checkInWithPrisma(prisma: PrismaClient, input: CheckInInpu
     return {
       status: "duplicate" as const,
       record: existing,
-      message: `${input.displayName}님은 이미 ${formatKoreanTime(
-        existing.checkedInAt,
-      )}에 오출완했습니다.`,
+      message: buildDuplicateAttendanceMessage({
+        displayName: input.displayName,
+        checkedInAt: existing.checkedInAt,
+      }),
     };
   }
 
@@ -102,8 +111,11 @@ export async function checkInWithPrisma(prisma: PrismaClient, input: CheckInInpu
   return {
     status: "created" as const,
     record,
-    message: `${input.displayName}님 오늘 ${dailyRank}번째 오출완! ${formatKoreanTime(
-      input.now,
-    )} 현장 완료. 오늘의 칭호: ${title}`,
+    message: buildCreatedAttendanceMessage({
+      displayName: input.displayName,
+      dailyRank,
+      checkedInAt: input.now,
+      title,
+    }),
   };
 }

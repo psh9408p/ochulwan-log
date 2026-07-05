@@ -14,6 +14,7 @@ describe("attendance service", () => {
     expect(result.status).toBe("created");
     expect(result.record.dailyRank).toBe(1);
     expect(result.message).toContain("수진님 오늘 1번째 오출완!");
+    expect(result.message).toContain("출근 버튼 누른 손가락");
   });
 
   it("does not create duplicate same-day check-in", async () => {
@@ -29,6 +30,7 @@ describe("attendance service", () => {
 
     expect(duplicate.status).toBe("duplicate");
     expect(duplicate.message).toContain("수진님은 이미");
+    expect(duplicate.message).toContain("출근 도장은 하루 한 번");
     expect(service.records).toHaveLength(1);
   });
 });
