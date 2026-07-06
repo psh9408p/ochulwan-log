@@ -28,9 +28,21 @@ model AttendanceRecord {
   dailyRank      Int
   title          String
   member         Member   @relation(fields: [memberId], references: [id])
+  leaveReminders LeaveReminder[]
 
   @@unique([memberId, attendanceDate])
   @@index([attendanceDate, checkedInAt])
+}
+
+model LeaveReminder {
+  id                 String           @id @default(cuid())
+  attendanceRecordId String
+  stage              String
+  sentAt             DateTime         @default(now())
+  attendanceRecord   AttendanceRecord @relation(fields: [attendanceRecordId], references: [id])
+
+  @@unique([attendanceRecordId, stage])
+  @@index([stage, sentAt])
 }
 
 model CheckinRequest {

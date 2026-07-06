@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "reminders": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/leave-reminder-worker.mjs",
+    "reminders:once": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/leave-reminder-worker.mjs --once"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -28,6 +30,7 @@
     "eslint": "^9.39.4",
     "jsdom": "^25.0.1",
     "prisma": "^6.19.3",
+    "tsx": "^4.23.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
   }
